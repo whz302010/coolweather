@@ -1,13 +1,17 @@
 package com.example.acer_pc.coolweather.Activity;
 
+import android.graphics.Color;
+import android.os.Build;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.bumptech.glide.Glide;
 import com.example.acer_pc.coolweather.R;
 import com.example.acer_pc.coolweather.Utils.HttpUtil;
 import com.example.acer_pc.coolweather.Utils.SpUtil;
@@ -34,11 +38,20 @@ public class WeatherActivity extends AppCompatActivity {
     private TextView tv_crashCar;
     private TextView tv_sport;
     private ViewGroup ll_forecast;
+    private ImageView iv_bg;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        //设置背景与状态栏融合
+        View decorView = getWindow().getDecorView();
+        decorView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            getWindow().setStatusBarColor(Color.TRANSPARENT);
+        }
         setContentView(R.layout.activity_weather);
+
         sv_weather = (ScrollView) findViewById(R.id.sv_weather);
         tv_title = (TextView) findViewById(R.id.tv_title);
         tv_update_time = (TextView) findViewById(R.id.tv_update_time);
@@ -50,6 +63,7 @@ public class WeatherActivity extends AppCompatActivity {
         tv_crashCar = (TextView) findViewById(R.id.tv_suggestion_carCrash);
         tv_sport = (TextView) findViewById(R.id.tv_suggestion_sport);
         ll_forecast = (ViewGroup) findViewById(R.id.ll_forecast);
+        iv_bg = (ImageView) findViewById(R.id.iv_weather_bg);
         String weather = SpUtil.getString(getApplicationContext(), "weather");
         //有缓存加载缓存
         if (weather != null) {
@@ -61,10 +75,41 @@ public class WeatherActivity extends AppCompatActivity {
             sv_weather.setVisibility(View.INVISIBLE);
             requestWeather(weatherID);
         }
+        String bing_pic = SpUtil.getString(getApplicationContext(), "bing_pic");
+        if (bing_pic!=null){
+            Glide.with(this).load(bing_pic).into(iv_bg);
+        }else {
+            loadPic();
+        }
+    }
+
+    private void loadPic() {
+        String address="http://guolin.tech/api/bing_pic";
+        HttpUtil.sendOkhttpRequest(address, new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                e.printStackTrace();
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                final String responseText = response.body().string();
+                if (responseText!=null){
+                    SpUtil.putString(getApplicationContext(),"bing_pic",responseText);
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            Glide.with(WeatherActivity.this).load(responseText).into(iv_bg);
+                        }
+                    });
+                }
+            }
+        });
     }
 
     private void requestWeather(String weatherID) {
         String address = "http;//guolin.tech/api/weather?cityid=" + weatherID + "&879eefe982094a63af50503f1e32bf45";
+        loadPic();
         HttpUtil.sendOkhttpRequest(address, new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
@@ -129,8 +174,6 @@ public class WeatherActivity extends AppCompatActivity {
         tv_sport.setText(sport);
 
         sv_weather.setVisibility(View.VISIBLE);
-
-
     }
 
 
