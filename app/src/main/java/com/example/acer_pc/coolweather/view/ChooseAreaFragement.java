@@ -15,6 +15,7 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.example.acer_pc.coolweather.Activity.MainActivity;
 import com.example.acer_pc.coolweather.Activity.WeatherActivity;
 import com.example.acer_pc.coolweather.R;
 import com.example.acer_pc.coolweather.Utils.HttpUtil;
@@ -39,8 +40,8 @@ import okhttp3.Response;
 
 public class ChooseAreaFragement extends Fragment {
     private static final int LEVEL_PROVINCE = 0;
-    private static final int LEVEL_CITY = 0;
-    private static final int LEVEL_COUNTRY = 0;
+    private static final int LEVEL_CITY = 1;
+    private static final int LEVEL_COUNTRY = 2;
     private TextView tv_title;
     private Button btn_back;
     private ListView lv_area;
@@ -51,7 +52,6 @@ public class ChooseAreaFragement extends Fragment {
     private int currentLevel;
     private Province selectedProvince;
     private City selectedCity;
-    private ProgressDialog progressDialog;
     private ArrayAdapter<String> adapter;
     private ProgressDialog dialog;
 
@@ -70,21 +70,30 @@ public class ChooseAreaFragement extends Fragment {
     @Override
     public void onActivityCreated(@Nullable Bundle savedInstanceState) {
         queryProvinces();
+        super.onActivityCreated(savedInstanceState);
         lv_area.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                 if (currentLevel == LEVEL_PROVINCE) {
                     selectedProvince = provinceList.get(position);
                     queryCities();
-                } else if (currentLevel == LEVEL_CITY) {
+                } else if(currentLevel == LEVEL_CITY) {
                     selectedCity = cityList.get(position);
                     queryCounties();
                 }else if (currentLevel==LEVEL_COUNTRY){
                     String weatherId = countryList.get(position).getWeatherId();
-                    Intent intent = new Intent(getContext(), WeatherActivity.class);
-                    intent.putExtra("weatherId",weatherId);
-                    startActivity(intent);
-                    getActivity().finish();
+                    if (getActivity() instanceof MainActivity){
+                        Intent intent = new Intent(getContext(), WeatherActivity.class);
+                        intent.putExtra("weatherId",weatherId);
+                        startActivity(intent);
+                        getActivity().finish();
+                    }else if (getActivity() instanceof WeatherActivity){
+                        WeatherActivity activity= (WeatherActivity) getActivity();
+                        activity.drawerLayout.closeDrawers();
+                        activity.swip_refresh.setRefreshing(true);
+                        activity.requestWeather(weatherId);
+                    }
+
                 }
             }
 
@@ -100,7 +109,7 @@ public class ChooseAreaFragement extends Fragment {
                 }
             }
         });
-        super.onActivityCreated(savedInstanceState);
+
     }
 
     /**
@@ -109,7 +118,7 @@ public class ChooseAreaFragement extends Fragment {
     private void queryCounties() {
         tv_title.setText(selectedCity.getCityName());
         btn_back.setVisibility(View.VISIBLE);
-        countryList = DataSupport.where("cityId = ?",String.valueOf(selectedCity.cityId)).find(Country.class);
+        countryList = DataSupport.where("cityid = ?",String.valueOf(selectedCity.getId())).find(Country.class);
         if (countryList.size() > 0) {
             datalist.clear();
             for (Country country:countryList) {
@@ -121,8 +130,9 @@ public class ChooseAreaFragement extends Fragment {
 
         } else {
             int procinceId=selectedProvince.getProvinceId();
-            String address = "http://guolin/tech/api/china"+procinceId;
-            queryFromServer(address, "city");
+            int cityId=selectedCity.getCityId();
+            String address = "http://guolin.tech/api/china/"+procinceId+"/"+cityId;
+            queryFromServer(address, "country");
         }
     }
 
@@ -144,7 +154,7 @@ public class ChooseAreaFragement extends Fragment {
 
         } else {
             int procinceId=selectedProvince.getProvinceId();
-            String address = "http://guolin/tech/api/china"+procinceId;
+            String address = "http://guolin.tech/api/china/"+procinceId;
             queryFromServer(address, "city");
         }
 
@@ -168,7 +178,7 @@ public class ChooseAreaFragement extends Fragment {
             currentLevel = LEVEL_PROVINCE;
 
         } else {
-            String address = "http://guolin/tech/api/china";
+            String address = "http://guolin.tech/api/china";
             queryFromServer(address, "province");
         }
     }
@@ -199,9 +209,9 @@ public class ChooseAreaFragement extends Fragment {
                 String responseText = response.body().string();
                 boolean result = false;
                 if ("city".equals(type)) {
-                    result = Utility.handleCityResponse(responseText, selectedProvince.getProvinceId());
+                    result = Utility.handleCityResponse(responseText, selectedProvince.getId());
                 } else if ("country".equals(type)) {
-                    result = Utility.handleCountryResponse(responseText, selectedCity.getCityId());
+                    result = Utility.handleCountryResponse(responseText, selectedCity.getId());
 
                 } else if ("province".equals(type)) {
                     result = Utility.handleProcinceResponse(responseText);
@@ -232,7 +242,7 @@ public class ChooseAreaFragement extends Fragment {
     }
 
     private void showProgressDialog() {
-        if (datalist != null) {
+        if (dialog == null) {
             dialog = new ProgressDialog(getActivity());
             dialog.setMessage("正在加载中。。。。。。。");
             dialog.setCanceledOnTouchOutside(false);
